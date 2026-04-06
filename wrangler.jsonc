@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "teamwork-contact-api",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-04-06",
+  "workers_dev": true,
+  "vars": {
+    "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:4173,https://teamwork-construction.de,https://www.teamwork-construction.de,https://zarasheikhi.github.io",
+    "CONTACT_TO_EMAIL": "kontakt@teamwork-construction.de",
+    "RESEND_FROM_EMAIL": "Teamwork Construction <kontakt@send.teamwork-construction.de>"
+  }
+}

@@ -21,6 +21,7 @@ const PHONE_TEL = "tel:+491744257898";
 const WHATSAPP_DISPLAY = "+49 174 4257898";
 const WHATSAPP_LINK = "https://wa.me/491744257898";
 const EMAIL = "kontakt@teamwork-construction.de";
+const CONTACT_API_URL = import.meta.env.VITE_CONTACT_API_URL || (import.meta.env.DEV ? "http://127.0.0.1:8787/contact" : "https://api.teamwork-construction.de/contact");
 const QUERY_PARAMS = {
   service: "leistung",
   location: "ort",
@@ -1140,6 +1141,7 @@ function ContactForm({ prefill = { service: "", location: "", source: "" } }) {
       location: "",
       message: "",
       wantsKfw: false,
+      website: "",
     }),
     []
   );
@@ -1147,12 +1149,14 @@ function ContactForm({ prefill = { service: "", location: "", source: "" } }) {
   const [formData, setFormData] = useState({ ...emptyData, service: prefill.service, location: prefill.location });
   const [errors, setErrors] = useState({});
   const [success, setSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState(1);
 
   useEffect(() => {
     setFormData({ ...emptyData, service: prefill.service, location: prefill.location });
     setErrors({});
     setSuccess(false);
+    setSubmitting(false);
     setStep(1);
   }, [emptyData, prefill.location, prefill.service]);
 
@@ -1179,7 +1183,7 @@ function ContactForm({ prefill = { service: "", location: "", source: "" } }) {
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
     setFormData((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
-    setErrors((prev) => ({ ...prev, [name]: "" }));
+    setErrors((prev) => ({ ...prev, [name]: "", submit: "" }));
     if (success) setSuccess(false);
   };
 
@@ -1193,12 +1197,14 @@ function ContactForm({ prefill = { service: "", location: "", source: "" } }) {
     setStep(2);
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     if (step === 1) {
       handleNextStep();
       return;
     }
+
+    if (submitting) return;
 
     const nextErrors = { ...validateStepOne(), ...validateStepTwo() };
 
@@ -1211,17 +1217,58 @@ function ContactForm({ prefill = { service: "", location: "", source: "" } }) {
       return;
     }
 
-    setSuccess(true);
+    const serviceLabel = SERVICES.find((service) => service.id === formData.service)?.title || formData.service;
+    const payload = {
+      name: formData.name.trim(),
+      phone: formData.phone.trim(),
+      email: formData.email.trim(),
+      service: serviceLabel,
+      location: formData.location.trim(),
+      message: formData.message.trim(),
+      wantsKfw: Boolean(formData.wantsKfw),
+      source: prefill.source || "website",
+      website: formData.website.trim(),
+    };
+
+    setSubmitting(true);
     setErrors({});
-    setFormData(emptyData);
-    setStep(1);
+
+    try {
+      const response = await fetch(CONTACT_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Versand fehlgeschlagen. Bitte telefonisch oder per WhatsApp anfragen.");
+      }
+
+      setSuccess(true);
+      setErrors({});
+      setFormData({ ...emptyData, service: prefill.service, location: prefill.location });
+      setStep(1);
+    } catch (error) {
+      setSuccess(false);
+      setErrors((prev) => ({
+        ...prev,
+        submit: error instanceof Error ? error.message : "Versand fehlgeschlagen. Bitte telefonisch oder per WhatsApp anfragen.",
+      }));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const inputBaseClass =
     "mt-1 w-full rounded-xl border border-gray-300 bg-white px-3.5 py-3 text-base text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 sm:py-2.5 sm:text-sm";
+  const primaryActionClass = `${primaryBtnClass} disabled:pointer-events-none disabled:opacity-60`;
+  const secondaryActionClass = `${secondaryBtnClass} disabled:pointer-events-none disabled:opacity-60`;
 
   return (
-    <form onSubmit={handleSubmit} noValidate className={`${cardClass} p-4 sm:p-6`}>
+    <form onSubmit={handleSubmit} noValidate aria-busy={submitting} className={`${cardClass} p-4 sm:p-6`}>
       <h3 className="text-lg font-semibold text-gray-900">Projektanfrage senden</h3>
       <p className="mt-1 text-sm text-gray-600">
         Wir melden uns mit einem klaren nächsten Schritt. Fragen zur KfW-Förderberatung können Sie direkt angeben.
@@ -1247,6 +1294,19 @@ function ContactForm({ prefill = { service: "", location: "", source: "" } }) {
       {prefill.source ? (
         <p className="mt-3 text-xs text-gray-500">Anfragekontext: {prefill.source.replace(/-/g, " ")}</p>
       ) : null}
+
+      <label className="sr-only" aria-hidden="true">
+        Website
+        <input
+          type="text"
+          name="website"
+          value={formData.website}
+          onChange={handleChange}
+          autoComplete="off"
+          tabIndex={-1}
+          className="sr-only"
+        />
+      </label>
 
       {step === 1 ? (
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -1360,16 +1420,16 @@ function ContactForm({ prefill = { service: "", location: "", source: "" } }) {
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         {step === 1 ? (
-          <button type="button" onClick={handleNextStep} className={primaryBtnClass}>
+          <button type="button" onClick={handleNextStep} className={primaryActionClass} disabled={submitting}>
             Weiter
           </button>
         ) : (
           <>
-            <button type="button" onClick={() => setStep(1)} className={secondaryBtnClass}>
+            <button type="button" onClick={() => setStep(1)} className={secondaryActionClass} disabled={submitting}>
               Zurück
             </button>
-            <button type="submit" className={primaryBtnClass}>
-              Anfrage senden
+            <button type="submit" className={primaryActionClass} disabled={submitting}>
+              {submitting ? "Wird gesendet..." : "Anfrage senden"}
             </button>
           </>
         )}
@@ -1377,6 +1437,15 @@ function ContactForm({ prefill = { service: "", location: "", source: "" } }) {
           Lieber direkt anrufen
         </a>
       </div>
+
+      {errors.submit ? (
+        <p
+          className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+          aria-live="assertive"
+        >
+          {errors.submit}
+        </p>
+      ) : null}
 
       {success ? (
         <p
