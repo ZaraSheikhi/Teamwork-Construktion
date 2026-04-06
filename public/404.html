@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Weiterleitung | TEAMWORK CONSTRUCTION</title>
+    <script>
+      (function redirectToSpaEntry() {
+        var route = window.location.pathname + window.location.search + window.location.hash;
+        var target = new URL("/", window.location.origin);
+        target.searchParams.set("__route", route);
+        window.location.replace(target.toString());
+      })();
+    </script>
+  </head>
+  <body>
+    <p>Weiterleitung...</p>
+  </body>
+</html>

@@ -8,8 +8,12 @@
       name="description"
       content="Teamwork Construction: Ihr Partner für Renovierung, Sanierung & Innenausbau in Bremen und Umgebung."
     />
-    <link rel="icon" type="image/png" href="%BASE_URL%logo.png" />
-    <link rel="apple-touch-icon" href="%BASE_URL%logo.png" />
+    <meta property="og:site_name" content="TEAMWORK CONSTRUCTION" />
+    <meta property="og:locale" content="de_DE" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/png" href="%BASE_URL%images/brand/logo.png" />
+    <link rel="apple-touch-icon" href="%BASE_URL%images/brand/logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,6 +23,15 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function restoreRouteFromRedirect() {
+        const currentUrl = new URL(window.location.href);
+        const redirectedRoute = currentUrl.searchParams.get("__route");
+        if (!redirectedRoute) return;
+        currentUrl.searchParams.delete("__route");
+        window.history.replaceState(null, "", redirectedRoute);
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
