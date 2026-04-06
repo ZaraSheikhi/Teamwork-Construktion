@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   BrowserRouter,
   Link,
@@ -12,6 +12,7 @@ import {
 } from "react-router-dom";
 import {
   BADGES,
+  BUSINESS_INFO,
   COMPANY_NAME,
   CONTACT_API_URL,
   CONTACT_FAQ,
@@ -33,6 +34,7 @@ import {
   SERVICES,
   SERVICE_SEO_BY_ID,
   SERVICE_SEO_BY_SLUG,
+  SERVICE_SEO_REDIRECTS,
   SITE_URL,
   STATIC_SEO,
   STEPS,
@@ -51,9 +53,63 @@ const whatsappBtnClass =
   "inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 sm:min-h-0 sm:w-auto";
 const MENU_ANIM_MS = 280;
 const MENU_STAGGER_MS = 60;
+const CONSENT_STORAGE_KEY = "teamwork-consent-v1";
 const mobileCarouselTrackClass =
   "-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 pr-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 const mobileCarouselItemClass = "min-w-[88%] snap-center";
+const defaultConsentContext = {
+  preferences: { externalMedia: true },
+  hasChoice: true,
+  isReady: true,
+  isBannerOpen: false,
+  openSettings: () => {},
+  closeSettings: () => {},
+  acceptNecessaryOnly: () => {},
+  acceptExternalMedia: () => {},
+};
+const ConsentContext = createContext(defaultConsentContext);
+
+function isRemoteAssetUrl(value = "") {
+  return /^https?:\/\//i.test(value);
+}
+
+function readStoredConsent() {
+  if (typeof window === "undefined") {
+    return { externalMedia: false, hasChoice: false, isReady: false };
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(CONSENT_STORAGE_KEY);
+    if (!rawValue) {
+      return { externalMedia: false, hasChoice: false, isReady: true };
+    }
+
+    const parsedValue = JSON.parse(rawValue);
+    return {
+      externalMedia: Boolean(parsedValue?.externalMedia),
+      hasChoice: true,
+      isReady: true,
+    };
+  } catch {
+    return { externalMedia: false, hasChoice: false, isReady: true };
+  }
+}
+
+function storeConsent(externalMedia) {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(
+    CONSENT_STORAGE_KEY,
+    JSON.stringify({
+      externalMedia,
+      updatedAt: new Date().toISOString(),
+    })
+  );
+}
+
+function useConsent() {
+  return useContext(ConsentContext);
+}
 
 function buildContactPath({ serviceId = "", locationName = "", source = "" } = {}) {
   const params = new URLSearchParams();
@@ -116,7 +172,12 @@ function getPageContext(pathname) {
   if (pathname === "/projekte") return { source: "projekte" };
   if (pathname === "/ablauf") return { source: "ablauf" };
   if (pathname === "/kontakt") return { source: "kontakt" };
-  if (pathname === "/impressum" || pathname === "/datenschutz" || pathname === "/cookies") {
+  if (
+    pathname === "/impressum" ||
+    pathname === "/datenschutz" ||
+    pathname === "/agb" ||
+    pathname === "/cookies"
+  ) {
     return { source: "rechtliches" };
   }
 
@@ -170,7 +231,7 @@ function copyToClipboard(value) {
   });
 }
 
-function useSeo(title, metaDescription) {
+function useSeo(title, metaDescription, image = LOGO_SRC) {
   const location = useLocation();
 
   useEffect(() => {
@@ -188,6 +249,9 @@ function useSeo(title, metaDescription) {
     }
 
     const canonicalUrl = `${SITE_URL}${location.pathname}`;
+    const resolvedImage = image.startsWith("http")
+      ? image
+      : `${SITE_URL}${image.startsWith("/") ? image : `/${image}`}`;
 
     let canonicalTag = document.querySelector('link[rel="canonical"]');
     if (!canonicalTag) {
@@ -221,11 +285,80 @@ function useSeo(title, metaDescription) {
     ensureMetaProperty("og:description", metaDescription || "");
     ensureMetaProperty("og:url", canonicalUrl);
     ensureMetaProperty("og:type", "website");
+    ensureMetaProperty("og:image", resolvedImage);
 
     ensureMetaName("twitter:card", "summary_large_image");
     ensureMetaName("twitter:title", title || document.title);
     ensureMetaName("twitter:description", metaDescription || "");
-  }, [location.pathname, metaDescription, title]);
+    ensureMetaName("twitter:image", resolvedImage);
+  }, [image, location.pathname, metaDescription, title]);
+}
+
+function useStructuredData(id, data) {
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+
+    let script = document.getElementById(id);
+    if (!script) {
+      script = document.createElement("script");
+      script.setAttribute("type", "application/ld+json");
+      script.setAttribute("id", id);
+      document.head.appendChild(script);
+    }
+
+    script.textContent = JSON.stringify(data);
+
+    return () => {
+      const activeScript = document.getElementById(id);
+      if (activeScript) activeScript.remove();
+    };
+  }, [data, id]);
+}
+
+function buildBusinessStructuredData() {
+  const resolvedLogo = LOGO_SRC.startsWith("http")
+    ? LOGO_SRC
+    : `${SITE_URL}${LOGO_SRC.startsWith("/") ? LOGO_SRC : `/${LOGO_SRC}`}`;
+  const address = BUSINESS_INFO.address || {};
+  const hasAddress =
+    address.streetAddress ||
+    address.postalCode ||
+    address.addressLocality ||
+    address.addressRegion ||
+    address.addressCountry;
+
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": ["LocalBusiness", "Contractor"],
+    name: BUSINESS_INFO.name,
+    ...(BUSINESS_INFO.legalName ? { legalName: BUSINESS_INFO.legalName } : {}),
+    url: BUSINESS_INFO.url,
+    image: resolvedLogo,
+    logo: resolvedLogo,
+    telephone: BUSINESS_INFO.telephone,
+    email: BUSINESS_INFO.email,
+    areaServed: BUSINESS_INFO.areaServed.map((area) => ({
+      "@type": "City",
+      name: area,
+    })),
+  };
+
+  if (hasAddress) {
+    schema.address = {
+      "@type": "PostalAddress",
+      ...(address.streetAddress ? { streetAddress: address.streetAddress } : {}),
+      ...(address.postalCode ? { postalCode: address.postalCode } : {}),
+      ...(address.addressLocality ? { addressLocality: address.addressLocality } : {}),
+      ...(address.addressRegion ? { addressRegion: address.addressRegion } : {}),
+      ...(address.addressCountry ? { addressCountry: address.addressCountry } : {}),
+    };
+  }
+
+  if (BUSINESS_INFO.openingHoursSpecification?.length) {
+    schema.openingHoursSpecification = BUSINESS_INFO.openingHoursSpecification;
+  }
+
+  return schema;
 }
 
 function BurgerIcon({ open, reduceMotion }) {
@@ -497,15 +630,15 @@ function DesktopActionBar({ whatsappHref }) {
   );
 }
 
-function SectionHeading({ label, title, subtitle }) {
+function SectionHeading({ label, title, subtitle, as: Tag = "h2" }) {
   return (
     <div className="mb-7 sm:mb-10">
       <p className="mb-3 text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-red-600 sm:text-xs sm:tracking-widest">
         {label}
       </p>
-      <h1 className="text-[1.9rem] font-black uppercase leading-[1.02] tracking-tight text-gray-900 sm:text-4xl lg:text-5xl">
+      <Tag className="text-[1.9rem] font-black uppercase leading-[1.02] tracking-tight text-gray-900 sm:text-4xl lg:text-5xl">
         {title}
-      </h1>
+      </Tag>
       <div className="mt-3 h-1.5 w-14 rounded-full bg-red-600 sm:mt-4 sm:w-16" aria-hidden="true" />
       {subtitle ? <p className="mt-3 max-w-3xl text-[0.97rem] leading-relaxed text-gray-600 sm:mt-4 sm:text-lg">{subtitle}</p> : null}
     </div>
@@ -548,6 +681,116 @@ function Reveal({ children, className = "", delay = 0 }) {
     >
       {children}
     </div>
+  );
+}
+
+function ConsentImage({ src, alt, className = "", loading = "lazy" }) {
+  const { preferences } = useConsent();
+  const requiresConsent = isRemoteAssetUrl(src);
+
+  if (!requiresConsent || preferences.externalMedia) {
+    return <img src={src} alt={alt} loading={loading} className={className} />;
+  }
+
+  return (
+    <div
+      role="img"
+      aria-label={`${alt}. Bild wird erst nach Ihrer Einwilligung zu externen Medien geladen.`}
+      className={`relative overflow-hidden bg-gradient-to-br from-gray-100 via-white to-red-50 ${className}`}
+    >
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(239,68,68,0.18),transparent_42%)]"
+        aria-hidden="true"
+      />
+      <div className="relative flex h-full w-full flex-col items-center justify-center px-4 text-center">
+        <img src={LOGO_SRC} alt="" aria-hidden="true" className="h-12 w-auto opacity-90 sm:h-14" />
+        <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-red-700 sm:text-xs sm:tracking-widest">
+          Externe Medien blockiert
+        </p>
+        <p className="mt-2 max-w-xs text-sm leading-relaxed text-gray-600">
+          Dieses Bild wird erst nach Ihrer Zustimmung zu externen Medien geladen.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ConsentBanner() {
+  const {
+    hasChoice,
+    isBannerOpen,
+    isReady,
+    acceptNecessaryOnly,
+    acceptExternalMedia,
+    closeSettings,
+  } = useConsent();
+
+  if (!isReady || !isBannerOpen) return null;
+
+  const neutralButtonClass =
+    "inline-flex min-h-12 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2";
+  const accentButtonClass =
+    "inline-flex min-h-12 items-center justify-center rounded-xl border border-red-600 bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2";
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-[80] px-3 pb-3 sm:px-6 sm:pb-6">
+      <div className="mx-auto max-w-4xl rounded-3xl border border-gray-200 bg-white p-5 shadow-2xl shadow-gray-200/80 backdrop-blur sm:p-6">
+        <div className="flex flex-col gap-4">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-red-600">Cookie-Einstellungen</p>
+            <h2 className="text-xl font-black tracking-tight text-gray-900 sm:text-2xl">
+              Externe Medien erst nach Einwilligung
+            </h2>
+            <p className="max-w-3xl text-sm leading-relaxed text-gray-600 sm:text-[15px]">
+              Diese Website setzt aktuell keine Analyse- oder Marketing-Cookies ein. Externe Bilder von
+              Pexels und Unsplash laden wir aber nur nach Ihrer Einwilligung, weil dabei personenbezogene
+              Daten wie Ihre IP-Adresse an Drittanbieter übertragen werden können.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto] lg:items-center">
+            <button type="button" onClick={acceptNecessaryOnly} className={neutralButtonClass}>
+              Nur notwendige
+            </button>
+            <button type="button" onClick={acceptExternalMedia} className={accentButtonClass}>
+              Externe Medien akzeptieren
+            </button>
+            <NavLink
+              to="/datenschutz"
+              className="inline-flex min-h-12 items-center justify-center rounded-xl border border-transparent px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+              onClick={closeSettings}
+            >
+              Datenschutz
+            </NavLink>
+            {hasChoice ? (
+              <button
+                type="button"
+                onClick={closeSettings}
+                className="inline-flex min-h-12 items-center justify-center rounded-xl border border-transparent px-4 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
+              >
+                Schließen
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConsentSettingsButton() {
+  const { hasChoice, isReady, openSettings } = useConsent();
+
+  if (!isReady || !hasChoice) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={openSettings}
+      className="fixed bottom-24 left-3 z-[65] inline-flex min-h-11 items-center justify-center rounded-full border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-700 shadow-lg shadow-gray-200/80 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 sm:bottom-6 sm:left-6 sm:text-sm"
+    >
+      Cookie-Einstellungen
+    </button>
   );
 }
 
@@ -601,7 +844,7 @@ function HeroSplit({ eyebrow, title, subtitle, image, alt, primaryCta, secondary
 
         <Reveal className="lg:col-span-5" delay={130}>
           <div className={`${cardClass} overflow-hidden`}>
-            <img
+            <ConsentImage
               src={image}
               alt={alt}
               loading="lazy"
@@ -620,7 +863,12 @@ function StatBar() {
       <div className="grid grid-cols-3 gap-2 border-b border-gray-100 pb-4 sm:gap-4 sm:pb-5">
         {KPIS.map((item) => (
           <div key={item.label} className="rounded-xl border border-red-100 bg-red-50/60 p-3 sm:p-4">
-            <p className="text-xl font-black tracking-tight text-red-700 min-[420px]:text-2xl sm:text-4xl">{item.value}</p>
+            <p
+              aria-label={item.ariaLabel || item.value}
+              className="text-xl font-black tracking-tight text-red-700 min-[420px]:text-2xl sm:text-4xl"
+            >
+              {item.value}
+            </p>
             <p className="mt-1 text-[11px] leading-tight font-medium text-gray-600 sm:text-sm">{item.label}</p>
           </div>
         ))}
@@ -1031,7 +1279,7 @@ function HomePage() {
               </p>
               <div className="mt-3 flex flex-wrap gap-3">
                 <Link
-                  to="/leistungen/renovierung-modernisierung-bremen"
+                  to="/leistungen/renovierung-modernisierung"
                   className="text-sm font-semibold text-red-700 underline decoration-red-300 underline-offset-4 hover:text-red-800"
                 >
                   Mehr zur KfW-Förderberatung
@@ -1061,7 +1309,7 @@ function HomePage() {
         <div className={`${containerClass} grid gap-8 lg:grid-cols-12 lg:items-center`}>
           <Reveal className="lg:col-span-5">
             <div className={`${cardClass} overflow-hidden`}>
-              <img
+              <ConsentImage
                 src={IMAGE_SOURCES.homeStory}
                 alt="Werkzeuge und Materialien für den Innenausbau"
                 loading="lazy"
@@ -1126,7 +1374,7 @@ function HomePage() {
                 return (
                   <Reveal key={service.id} delay={index * 80} className={mobileCarouselItemClass}>
                     <article className={`${cardClass} overflow-hidden`}>
-                      <img
+                      <ConsentImage
                         src={service.image}
                         alt={service.title}
                         loading="lazy"
@@ -1167,7 +1415,7 @@ function HomePage() {
                 return (
                   <Reveal key={service.id} delay={index * 70}>
                     <article className={`${cardClass} overflow-hidden`}>
-                      <img
+                      <ConsentImage
                         src={service.image}
                         alt={service.title}
                         loading="lazy"
@@ -1206,7 +1454,7 @@ function HomePage() {
                 <a href={homeWhatsappHref} target="_blank" rel="noreferrer" className={whatsappBtnClass}>
                   WhatsApp Anfrage starten
                 </a>
-                <Link to="/leistungen/renovierung-modernisierung-bremen" className={secondaryBtnClass}>
+                <Link to="/leistungen/renovierung-modernisierung" className={secondaryBtnClass}>
                   KfW-Förderberatung ansehen
                 </Link>
               </div>
@@ -1293,7 +1541,7 @@ function HomePage() {
               {homeProjectPreview.map((project, index) => (
                 <Reveal key={project.id} delay={index * 80} className={mobileCarouselItemClass}>
                   <article className={`${cardClass} overflow-hidden`}>
-                    <img
+                    <ConsentImage
                       src={project.image}
                       alt={project.title}
                       loading="lazy"
@@ -1324,7 +1572,7 @@ function HomePage() {
               renderItem={(project, index) => (
                 <Reveal key={project.id} delay={index * 80}>
                   <article className={`${cardClass} overflow-hidden`}>
-                    <img
+                    <ConsentImage
                       src={project.image}
                       alt={project.title}
                       loading="lazy"
@@ -1418,7 +1666,12 @@ function LeistungenPage() {
 
               return (
                 <article key={service.id} className={`${cardClass} overflow-hidden`}>
-                  <img src={service.image} alt={service.title} loading="lazy" className="h-44 w-full object-cover" />
+                  <ConsentImage
+                    src={service.image}
+                    alt={service.title}
+                    loading="lazy"
+                    className="h-44 w-full object-cover"
+                  />
                   <div className="p-5">
                     <p className="font-mono text-3xl font-bold leading-none text-red-600">{service.id}</p>
                     <h3 className="mt-3 text-xl font-semibold text-gray-900">{service.title}</h3>
@@ -1460,7 +1713,7 @@ function LeistungenPage() {
               Parallel planen wir die Ausführung von Beginn an mit Arbeiten nach KfW-Vorgaben.
             </p>
             <div className="mt-4 flex flex-wrap gap-3">
-              <Link to="/leistungen/renovierung-modernisierung-bremen" className={primaryBtnClass}>
+              <Link to="/leistungen/renovierung-modernisierung" className={primaryBtnClass}>
                 KfW-Leistungsseite ansehen
               </Link>
               <Link to={buildContactPath({ serviceId: "01", source: "kfw-box-leistungen" })} className={secondaryBtnClass}>
@@ -1499,7 +1752,12 @@ function ProjektePage() {
             gridClassName="sm:grid-cols-2 lg:grid-cols-3"
             renderItem={(project) => (
               <article key={project.id} className={`${cardClass} overflow-hidden`}>
-                <img src={project.image} alt={project.title} loading="lazy" className="h-44 w-full object-cover" />
+                <ConsentImage
+                  src={project.image}
+                  alt={project.title}
+                  loading="lazy"
+                  className="h-44 w-full object-cover"
+                />
                 <div className="space-y-3 p-5">
                   <div className="flex flex-wrap gap-2">
                     <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
@@ -1567,7 +1825,12 @@ function AblaufPage() {
               gridClassName="md:grid-cols-2"
               renderItem={(step) => (
                 <article key={step.id} className={`${cardClass} overflow-hidden`}>
-                  <img src={step.image} alt={`Schritt ${step.id}: ${step.title}`} loading="lazy" className="h-36 w-full object-cover" />
+                  <ConsentImage
+                    src={step.image}
+                    alt={`Schritt ${step.id}: ${step.title}`}
+                    loading="lazy"
+                    className="h-36 w-full object-cover"
+                  />
                   <div className="p-5 sm:p-6">
                     <p className="font-mono text-3xl font-bold leading-none text-red-600">{step.id}</p>
                     <h3 className="mt-3 text-xl font-semibold text-gray-900">{step.title}</h3>
@@ -1627,7 +1890,7 @@ function KontaktPage() {
                     KfW-Beratung anfragen
                   </Link>
                   <Link
-                    to="/leistungen/renovierung-modernisierung-bremen"
+                    to="/leistungen/renovierung-modernisierung"
                     className="block text-sm font-semibold text-red-700 underline decoration-red-300 underline-offset-4 hover:text-red-800"
                   >
                     Zur KfW-Leistungsseite
@@ -1663,7 +1926,12 @@ function KontaktPage() {
               </article>
 
               <article className={`${cardClass} overflow-hidden`}>
-                <img src={IMAGE_SOURCES.kontaktHero} alt="Kontaktmotiv Teamwork Construction" loading="lazy" className="h-44 w-full object-cover" />
+                <ConsentImage
+                  src={IMAGE_SOURCES.kontaktHero}
+                  alt="Kontaktmotiv Teamwork Construction"
+                  loading="lazy"
+                  className="h-44 w-full object-cover"
+                />
                 <div className="p-4 sm:p-5">
                   <div className="flex flex-col items-start gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
                     <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">E-Mail</p>
@@ -1715,7 +1983,7 @@ function KontaktPage() {
 function LegalPage({ pageKey }) {
   const page = LEGAL_CONTENT[pageKey];
   if (!page) return <Navigate to="/" replace />;
-  useSeo(`${page.title} | ${COMPANY_NAME}`, page.subtitle);
+  useSeo(`${page.title} | ${COMPANY_NAME}`, page.metaDescription || page.subtitle);
 
   return (
     <>
@@ -1733,11 +2001,27 @@ function LegalPage({ pageKey }) {
         <div className={containerClass}>
           <div className={`${cardClass} p-6 sm:p-8`}>
             <p className="text-base leading-relaxed text-gray-700">{page.intro}</p>
-            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            <div className="mt-6 space-y-4">
               {page.sections.map((section) => (
-                <article key={section.heading} className="rounded-xl border border-gray-200 bg-white p-4">
-                  <h3 className="text-base font-semibold text-gray-900">{section.heading}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-gray-600">{section.text}</p>
+                <article key={section.heading} className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
+                  <h2 className="text-base font-semibold text-gray-900 sm:text-lg">{section.heading}</h2>
+                  <div className="mt-3 space-y-3">
+                    {(section.paragraphs || (section.text ? [section.text] : [])).map((paragraph) => (
+                      <p key={paragraph} className="text-sm leading-relaxed text-gray-600 sm:text-[15px]">
+                        {paragraph}
+                      </p>
+                    ))}
+                    {section.list?.length ? (
+                      <ul className="space-y-2">
+                        {section.list.map((item) => (
+                          <li key={item} className="flex gap-3 text-sm leading-relaxed text-gray-600 sm:text-[15px]">
+                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" aria-hidden="true" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
                 </article>
               ))}
             </div>
@@ -1831,44 +2115,313 @@ function SeoTemplatePage({
 
 function ServiceSeoPage() {
   const { slug } = useParams();
+  const redirectedSlug = slug ? SERVICE_SEO_REDIRECTS[slug] : "";
+  if (redirectedSlug) {
+    return <Navigate to={`/leistungen/${redirectedSlug}`} replace />;
+  }
+
   const seoPage = slug ? SERVICE_SEO_BY_SLUG[slug] : null;
   if (!seoPage) return <Navigate to="/leistungen" replace />;
 
   const service = SERVICES.find((item) => item.id === seoPage.serviceId);
   if (!service) return <Navigate to="/leistungen" replace />;
 
-  useSeo(seoPage.title, seoPage.metaDescription);
+  useSeo(seoPage.title, seoPage.metaDescription, service.image);
 
-  const relatedLinks = [
-    { to: "/leistungen", label: "Alle Leistungen" },
-    { to: "/standorte/bremen", label: "Leistungen in Bremen" },
-    {
-      to: buildContactPath({ serviceId: service.id, source: `seo-links-${seoPage.slug}` }),
-      label: "Direkt anfragen",
-    },
-  ];
+  const faqStructuredData = useMemo(
+    () => ({
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: seoPage.faq.map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: item.answer,
+        },
+      })),
+    }),
+    [seoPage.faq]
+  );
+  useStructuredData("service-faq-schema", faqStructuredData);
 
-  if (seoPage.slug !== "renovierung-modernisierung-bremen") {
-    relatedLinks.splice(1, 0, {
-      to: "/leistungen/renovierung-modernisierung-bremen",
-      label: "KfW-Förderberatung",
-    });
-  }
+  const serviceRequestPath = buildContactPath({
+    serviceId: service.id,
+    source: `seo-${seoPage.slug}`,
+  });
+  const serviceWhatsappHref = buildWhatsappLink({
+    serviceId: service.id,
+    source: `seo-${seoPage.slug}`,
+  });
+  const relatedServiceLinks = (seoPage.relatedServiceIds || [])
+    .map((serviceId) => {
+      const relatedSeoPage = SERVICE_SEO_BY_ID[serviceId];
+      const relatedService = SERVICE_BY_ID[serviceId];
+      if (!relatedSeoPage || !relatedService) return null;
+
+      return {
+        to: `/leistungen/${relatedSeoPage.slug}`,
+        label: `${relatedService.title} in Bremen`,
+      };
+    })
+    .filter(Boolean);
 
   return (
-    <SeoTemplatePage
-      eyebrow={`Leistung · ${REGION}`}
-      title={seoPage.headline}
-      subtitle={seoPage.intro}
-      image={service.image}
-      alt={`${service.title} in ${REGION}`}
-      overviewTitle={`${service.title} im Detail`}
-      overviewText={`${service.description} ${service.text}`}
-      bulletPoints={[...service.points, "KfW-Förderberatung bei förderrelevanten Vorhaben"]}
-      primaryCta={<Link to={buildContactPath({ serviceId: service.id, source: `seo-${seoPage.slug}` })} className={`w-full ${primaryBtnClass}`}>Angebot anfragen</Link>}
-      secondaryCta={<a href={PHONE_TEL} className={`w-full ${secondaryBtnClass}`}>Direkt anrufen</a>}
-      relatedLinks={relatedLinks}
-    />
+    <>
+      <HeroSplit
+        eyebrow={`Leistung · ${REGION}`}
+        title={seoPage.headline}
+        subtitle={seoPage.intro}
+        image={service.image}
+        alt={`${service.title} in ${REGION}`}
+        primaryCta={
+          <Link to={serviceRequestPath} className={primaryBtnClass}>
+            Angebot anfragen
+          </Link>
+        }
+        secondaryCta={
+          <a href={serviceWhatsappHref} target="_blank" rel="noreferrer" className={whatsappBtnClass}>
+            WhatsApp
+          </a>
+        }
+        chips={seoPage.usps}
+      />
+
+      <section className="bg-gray-50 py-12 sm:py-16">
+        <div className={containerClass}>
+          <Reveal>
+            <div className={`${cardClass} border-red-200 bg-red-50/70 p-6 sm:p-8`}>
+              <p className="text-xs font-semibold uppercase tracking-widest text-red-700">Klarer Fokus</p>
+              <h2 className="mt-3 text-2xl font-black leading-tight tracking-tight text-gray-900 sm:text-3xl">
+                {seoPage.leadSentence}
+              </h2>
+              <p className="mt-4 max-w-3xl text-sm leading-relaxed text-gray-700 sm:text-base">
+                {service.description} {service.text}
+              </p>
+              <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+                {seoPage.usps.map((point) => (
+                  <li
+                    key={point}
+                    className="flex items-start gap-3 rounded-xl border border-red-100 bg-white px-4 py-3 text-sm font-medium text-gray-700"
+                  >
+                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-red-600" aria-hidden="true" />
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      <section className="bg-white py-12 sm:py-16">
+        <div className={containerClass}>
+          <Reveal>
+            <div className="mb-8 flex flex-col gap-3 sm:mb-10">
+              <p className="text-xs font-semibold uppercase tracking-widest text-red-600">Ablauf</p>
+              <h2 className="text-3xl font-black tracking-tight text-gray-900 sm:text-4xl">
+                In 3 Schritten zu Ihrem {service.title}
+              </h2>
+              <p className="max-w-3xl text-sm leading-relaxed text-gray-600 sm:text-base">
+                Sie wissen jederzeit, was als Nächstes passiert und worauf wir den Fokus legen.
+              </p>
+            </div>
+          </Reveal>
+
+          <CardGrid
+            items={seoPage.process}
+            gridClassName="lg:grid-cols-3"
+            renderItem={(step, index) => (
+              <Reveal key={step.title} delay={index * 80}>
+                <article className={`${cardClass} h-full p-5 sm:p-6`}>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-red-600">
+                    Schritt {index + 1}
+                  </p>
+                  <h3 className="mt-3 text-xl font-bold text-gray-900">{step.title}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-gray-600">{step.text}</p>
+                </article>
+              </Reveal>
+            )}
+          />
+        </div>
+      </section>
+
+      <section className="bg-gray-50 py-12 sm:py-16">
+        <div className={containerClass}>
+          <Reveal>
+            <div className="mb-8 flex flex-col gap-3 sm:mb-10">
+              <p className="text-xs font-semibold uppercase tracking-widest text-red-600">Referenzen</p>
+              <h2 className="text-3xl font-black tracking-tight text-gray-900 sm:text-4xl">
+                Typische Projekte und Bildbeispiele
+              </h2>
+              <p className="max-w-3xl text-sm leading-relaxed text-gray-600 sm:text-base">
+                Drei typische Einsätze, wie diese Leistung in Bremen und Umgebung umgesetzt wird.
+              </p>
+            </div>
+          </Reveal>
+
+          <CardGrid
+            items={seoPage.references}
+            gridClassName="lg:grid-cols-3"
+            renderItem={(reference, index) => (
+              <Reveal key={`${reference.title}-${reference.location}`} delay={index * 90}>
+                <article className={`${cardClass} h-full overflow-hidden`}>
+                  <ConsentImage
+                    src={reference.image}
+                    alt={`${reference.title} in ${reference.location}`}
+                    loading="lazy"
+                    className="h-56 w-full object-cover"
+                  />
+                  <div className="p-5 sm:p-6">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+                      {reference.location}
+                    </p>
+                    <h3 className="mt-2 text-xl font-bold text-gray-900">{reference.title}</h3>
+                    <p className="mt-3 text-sm leading-relaxed text-gray-600">{reference.summary}</p>
+                  </div>
+                </article>
+              </Reveal>
+            )}
+          />
+        </div>
+      </section>
+
+      <section className="bg-white py-12 sm:py-16">
+        <div className={`${containerClass} grid gap-6 lg:grid-cols-12`}>
+          <div className="lg:col-span-8">
+            <Reveal>
+              <div className="mb-8 flex flex-col gap-3 sm:mb-10">
+                <p className="text-xs font-semibold uppercase tracking-widest text-red-600">FAQ</p>
+                <h2 className="text-3xl font-black tracking-tight text-gray-900 sm:text-4xl">
+                  Häufige Fragen zu {service.title}
+                </h2>
+                <p className="max-w-3xl text-sm leading-relaxed text-gray-600 sm:text-base">
+                  Kosten, Dauer, Ablauf und Material beantworten wir frühzeitig, damit Sie schneller entscheiden können.
+                </p>
+              </div>
+            </Reveal>
+
+            <div className="space-y-3">
+              {seoPage.faq.map((item, index) => (
+                <Reveal key={item.question} delay={index * 70}>
+                  <details className="rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+                    <summary className="cursor-pointer text-sm font-semibold text-gray-900 sm:text-base">
+                      {item.question}
+                    </summary>
+                    <p className="mt-3 text-sm leading-relaxed text-gray-600">{item.answer}</p>
+                  </details>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+
+          <div className="lg:col-span-4">
+            <Reveal delay={120} className="lg:sticky lg:top-28">
+              <aside className={`${cardClass} border-red-200 bg-red-50/70 p-5 sm:p-6`}>
+                <p className="text-xs font-semibold uppercase tracking-widest text-red-700">Anfrage starten</p>
+                <h3 className="mt-3 text-2xl font-black tracking-tight text-gray-900">
+                  Angebot oder WhatsApp
+                </h3>
+                <p className="mt-3 text-sm leading-relaxed text-gray-600">
+                  Wenn Sie schon Fotos, Maße oder eine kurze Beschreibung haben, können wir schneller einschätzen, was sinnvoll ist.
+                </p>
+                <div className="mt-5 grid gap-3">
+                  <Link to={serviceRequestPath} className={`w-full ${primaryBtnClass}`}>
+                    Angebot anfragen
+                  </Link>
+                  <a
+                    href={serviceWhatsappHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`w-full ${whatsappBtnClass}`}
+                  >
+                    WhatsApp starten
+                  </a>
+                </div>
+                <div className="mt-5 space-y-2 border-t border-red-200 pt-4">
+                  <p className="text-sm font-medium text-gray-700">Werktags Rückmeldung meist in 24-48h</p>
+                  <p className="text-sm font-medium text-gray-700">Direkte Abstimmung ohne unnötige Schleifen</p>
+                  <p className="text-sm font-medium text-gray-700">Einsatzgebiet: Bremen und Umgebung</p>
+                </div>
+                <div className="mt-5 border-t border-red-200 pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">Mehr Übersicht</p>
+                  <div className="mt-3 space-y-2">
+                    <Link
+                      to="/leistungen"
+                      className="block text-sm font-semibold text-red-700 underline decoration-red-300 underline-offset-4 hover:text-red-800"
+                    >
+                      Alle Leistungen ansehen
+                    </Link>
+                    <Link
+                      to="/projekte"
+                      className="block text-sm font-semibold text-red-700 underline decoration-red-300 underline-offset-4 hover:text-red-800"
+                    >
+                      Projekte ansehen
+                    </Link>
+                    <Link
+                      to="/kontakt"
+                      className="block text-sm font-semibold text-red-700 underline decoration-red-300 underline-offset-4 hover:text-red-800"
+                    >
+                      Kontaktseite öffnen
+                    </Link>
+                  </div>
+                </div>
+                {relatedServiceLinks.length ? (
+                  <div className="mt-5 border-t border-red-200 pt-4">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+                      Weitere Leistungen in Bremen & Umgebung
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {relatedServiceLinks.map((item) => (
+                        <Link
+                          key={item.to}
+                          to={item.to}
+                          className="block text-sm font-semibold text-red-700 underline decoration-red-300 underline-offset-4 hover:text-red-800"
+                        >
+                          {item.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </aside>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-red-600 py-12 sm:py-16">
+        <div className={containerClass}>
+          <Reveal>
+            <div className="rounded-3xl border border-white/15 bg-white/10 p-6 text-white shadow-2xl shadow-red-900/20 backdrop-blur sm:p-8">
+              <p className="text-xs font-semibold uppercase tracking-widest text-red-100">Nächster Schritt</p>
+              <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
+                {seoPage.leadSentence}
+              </h2>
+              <p className="mt-4 max-w-2xl text-sm leading-relaxed text-red-50 sm:text-base">
+                Senden Sie uns kurz Ihr Vorhaben. Wenn Sie möchten, direkt mit Fotos per WhatsApp.
+              </p>
+              <div className="mt-6 grid gap-3 sm:flex sm:flex-wrap">
+                <Link
+                  to={serviceRequestPath}
+                  className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-red-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-red-50"
+                >
+                  Angebot anfragen
+                </Link>
+                <a
+                  href={serviceWhatsappHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/40 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/20"
+                >
+                  WhatsApp
+                </a>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -1899,8 +2452,8 @@ function LocationSeoPage() {
       primaryCta={<Link to={buildContactPath({ locationName: locationPage.locationName, source: `standort-${locationPage.slug}` })} className={`w-full ${primaryBtnClass}`}>Projekt in {locationPage.locationName} anfragen</Link>}
       secondaryCta={<a href={PHONE_TEL} className={`w-full ${secondaryBtnClass}`}>Telefonische Erstberatung</a>}
       relatedLinks={[
-        { to: "/leistungen/renovierung-modernisierung-bremen", label: "Renovierung in Bremen" },
-        { to: "/leistungen/gartenarbeit-sportanlagen-bremen", label: "Gartenarbeit & Sportanlagen" },
+        { to: "/leistungen/renovierung-modernisierung", label: "Renovierung in Bremen" },
+        { to: "/leistungen/gartenarbeit-sportanlagen", label: "Gartenarbeit & Sportanlagen" },
         { to: "/leistungen", label: "Leistungsübersicht" },
       ]}
     />
@@ -1912,6 +2465,12 @@ function SiteLayout() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isHeaderHidden, setIsHeaderHidden] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [consentState, setConsentState] = useState({
+    externalMedia: false,
+    hasChoice: false,
+    isReady: false,
+  });
+  const [consentSettingsOpen, setConsentSettingsOpen] = useState(false);
   const location = useLocation();
   const pageContext = useMemo(() => getPageContext(location.pathname), [location.pathname]);
   const whatsappHref = useMemo(
@@ -1923,14 +2482,44 @@ function SiteLayout() {
       }),
     [pageContext.locationName, pageContext.serviceId, pageContext.source]
   );
+  const businessStructuredData = useMemo(() => buildBusinessStructuredData(), []);
+  useStructuredData("business-schema", businessStructuredData);
   const lastScrollYRef = useRef(0);
   const tickingRef = useRef(false);
+  const showConsentBanner =
+    consentState.isReady && (!consentState.hasChoice || consentSettingsOpen);
+  const applyConsentChoice = (externalMedia) => {
+    storeConsent(externalMedia);
+    setConsentState({
+      externalMedia,
+      hasChoice: true,
+      isReady: true,
+    });
+    setConsentSettingsOpen(false);
+  };
+  const consentContextValue = useMemo(
+    () => ({
+      preferences: { externalMedia: consentState.externalMedia },
+      hasChoice: consentState.hasChoice,
+      isReady: consentState.isReady,
+      isBannerOpen: showConsentBanner,
+      openSettings: () => setConsentSettingsOpen(true),
+      closeSettings: () => setConsentSettingsOpen(false),
+      acceptNecessaryOnly: () => applyConsentChoice(false),
+      acceptExternalMedia: () => applyConsentChoice(true),
+    }),
+    [consentState.externalMedia, consentState.hasChoice, consentState.isReady, showConsentBanner]
+  );
 
   useEffect(() => {
     document.documentElement.style.scrollBehavior = "smooth";
     return () => {
       document.documentElement.style.scrollBehavior = "";
     };
+  }, []);
+
+  useEffect(() => {
+    setConsentState(readStoredConsent());
   }, []);
 
   useEffect(() => {
@@ -2007,45 +2596,49 @@ function SiteLayout() {
   }, [menuOpen]);
 
   return (
-    <div className="min-h-screen bg-white text-gray-800">
-      <Header
-        menuOpen={menuOpen}
-        onMenuToggle={() => setMenuOpen((prev) => !prev)}
-        isScrolled={isScrolled}
-        isHeaderHidden={isHeaderHidden}
-        reduceMotion={reduceMotion}
-        whatsappHref={whatsappHref}
-      />
-      <MobileMenu
-        open={menuOpen}
-        onNavigate={() => setMenuOpen(false)}
-        isScrolled={isScrolled}
-        reduceMotion={reduceMotion}
-        whatsappHref={whatsappHref}
-      />
-      <DesktopActionBar whatsappHref={whatsappHref} />
-      <MobileActionBar hidden={menuOpen} whatsappHref={whatsappHref} />
+    <ConsentContext.Provider value={consentContextValue}>
+      <div className="min-h-screen bg-white text-gray-800">
+        <Header
+          menuOpen={menuOpen}
+          onMenuToggle={() => setMenuOpen((prev) => !prev)}
+          isScrolled={isScrolled}
+          isHeaderHidden={isHeaderHidden}
+          reduceMotion={reduceMotion}
+          whatsappHref={whatsappHref}
+        />
+        <MobileMenu
+          open={menuOpen}
+          onNavigate={() => setMenuOpen(false)}
+          isScrolled={isScrolled}
+          reduceMotion={reduceMotion}
+          whatsappHref={whatsappHref}
+        />
+        {!showConsentBanner ? <DesktopActionBar whatsappHref={whatsappHref} /> : null}
+        <MobileActionBar hidden={menuOpen || showConsentBanner} whatsappHref={whatsappHref} />
+        <ConsentSettingsButton />
+        <ConsentBanner />
 
-      <main className="pb-32 sm:pb-0">
-        <Outlet />
-      </main>
+        <main className="pb-32 sm:pb-0">
+          <Outlet />
+        </main>
 
-      <footer className="border-t border-red-100 bg-gray-50 py-8 pb-28 sm:pb-8">
-        <div className={`${containerClass} flex flex-col gap-4 text-center text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between sm:text-left`}>
-          <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center">
-            <img src={LOGO_SRC} alt={`${COMPANY_NAME} Logo`} className="h-14 w-auto sm:h-16" />
-            <p>© {new Date().getFullYear()} {COMPANY_NAME}. Alle Rechte vorbehalten.</p>
+        <footer className="border-t border-red-100 bg-gray-50 py-8 pb-28 sm:pb-8">
+          <div className={`${containerClass} flex flex-col gap-4 text-center text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between sm:text-left`}>
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center">
+              <img src={LOGO_SRC} alt={`${COMPANY_NAME} Logo`} className="h-14 w-auto sm:h-16" />
+              <p>© {new Date().getFullYear()} {COMPANY_NAME}. Alle Rechte vorbehalten.</p>
+            </div>
+            <nav aria-label="Footer Links" className="flex flex-wrap justify-center gap-4 sm:justify-start">
+              {FOOTER_LINKS.map((item) => (
+                <NavLink key={item.to} to={item.to} className="transition hover:text-red-700">
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
           </div>
-          <nav aria-label="Footer Links" className="flex flex-wrap justify-center gap-4 sm:justify-start">
-            {FOOTER_LINKS.map((item) => (
-              <NavLink key={item.to} to={item.to} className="transition hover:text-red-700">
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-        </div>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </ConsentContext.Provider>
   );
 }
 
@@ -2063,7 +2656,8 @@ export default function TeamworkLanding() {
           <Route path="/kontakt" element={<KontaktPage />} />
           <Route path="/impressum" element={<LegalPage pageKey="impressum" />} />
           <Route path="/datenschutz" element={<LegalPage pageKey="datenschutz" />} />
-          <Route path="/cookies" element={<LegalPage pageKey="cookies" />} />
+          <Route path="/agb" element={<LegalPage pageKey="agb" />} />
+          <Route path="/cookies" element={<Navigate to="/datenschutz" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
