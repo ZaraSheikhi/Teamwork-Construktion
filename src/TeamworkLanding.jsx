@@ -12,7 +12,7 @@ import {
   useParams,
 } from "react-router-dom";
 
-const COMPANY_NAME = "Teamwork Construktion";
+const COMPANY_NAME = "Teamwork Construction";
 const REGION = "Bremen & Umgebung";
 const LOGO_SRC = `${import.meta.env.BASE_URL}logo.png`;
 
@@ -20,7 +20,7 @@ const PHONE_DISPLAY = "+49 174 4257898";
 const PHONE_TEL = "tel:+491744257898";
 const WHATSAPP_DISPLAY = "+49 174 4257898";
 const WHATSAPP_LINK = "https://wa.me/491744257898";
-const EMAIL = "kontakt@teamwork-construktion.de";
+const EMAIL = "kontakt@teamwork-construction.de";
 const QUERY_PARAMS = {
   service: "leistung",
   location: "ort",
@@ -247,27 +247,27 @@ const BADGES = [
 
 const STATIC_SEO = {
   home: {
-    title: "Renovierung & Innenausbau in Bremen | Teamwork Construktion",
+    title: "Renovierung & Innenausbau in Bremen | Teamwork Construction",
     metaDescription:
-      "Teamwork Construktion ist Ihr Partner für Renovierung, Sanierung, Innenausbau sowie Gartenarbeit und Sportanlagen in Bremen & Umgebung. Jetzt unverbindlich anfragen.",
+      "Teamwork Construction ist Ihr Partner für Renovierung, Sanierung, Innenausbau sowie Gartenarbeit und Sportanlagen in Bremen & Umgebung. Jetzt unverbindlich anfragen.",
   },
   kontakt: {
-    title: "Kontakt & Anfrage in Bremen | Teamwork Construktion",
+    title: "Kontakt & Anfrage in Bremen | Teamwork Construction",
     metaDescription:
-      "Telefon, WhatsApp oder Formular: Kontaktieren Sie Teamwork Construktion in Bremen & Umgebung. Schnelle Rückmeldung inklusive KfW-Förderberatung.",
+      "Telefon, WhatsApp oder Formular: Kontaktieren Sie Teamwork Construction in Bremen & Umgebung. Schnelle Rückmeldung inklusive KfW-Förderberatung.",
   },
   leistungenHub: {
-    title: "Leistungen in Bremen | Teamwork Construktion",
+    title: "Leistungen in Bremen | Teamwork Construction",
     metaDescription:
       "Alle Leistungen im Überblick: Renovierung, Innenausbau, Trockenbau, Boden & Fliesen, Bad-Teilmodernisierung, Wasserschaden-Sanierung, Gartenarbeit und Sportanlagen.",
   },
   projekteHub: {
-    title: "Projekte in Bremen & Umgebung | Teamwork Construktion",
+    title: "Projekte in Bremen & Umgebung | Teamwork Construction",
     metaDescription:
       "Referenzen aus Bremen & Umgebung: echte Projekte mit klaren Ergebnissen, transparenter Umsetzung und termintreuer Übergabe.",
   },
   ablaufHub: {
-    title: "Ablauf vom Erstkontakt bis Umsetzung | Teamwork Construktion",
+    title: "Ablauf vom Erstkontakt bis Umsetzung | Teamwork Construction",
     metaDescription:
       "So läuft Ihr Projekt ab: Anfrage, Check, transparentes Angebot und saubere Umsetzung mit klarer Kommunikation in Bremen & Umgebung.",
   },
@@ -277,7 +277,7 @@ const SERVICE_SEO_PAGES = [
   {
     serviceId: "01",
     slug: "renovierung-modernisierung-bremen",
-    title: "Renovierung in Bremen | Teamwork Construktion",
+    title: "Renovierung in Bremen | Teamwork Construction",
     metaDescription:
       "Renovierung und Modernisierung in Bremen: sauber, termintreu und planbar. Auf Wunsch mit KfW-Förderberatung und Arbeiten nach KfW-Vorgaben.",
     headline: "Renovierung & Modernisierung in Bremen",
@@ -287,9 +287,9 @@ const SERVICE_SEO_PAGES = [
   {
     serviceId: "02",
     slug: "innenausbau-bremen",
-    title: "Innenausbau in Bremen | Teamwork Construktion",
+    title: "Innenausbau in Bremen | Teamwork Construction",
     metaDescription:
-      "Innenausbau in Bremen vom Konzept bis zur Ausführung: funktional, hochwertig und zuverlässig. Teamwork Construktion für private Wohnprojekte.",
+      "Innenausbau in Bremen vom Konzept bis zur Ausführung: funktional, hochwertig und zuverlässig. Teamwork Construction für private Wohnprojekte.",
     headline: "Innenausbau in Bremen",
     intro:
       "Vom Raumkonzept bis zur fertigen Umsetzung: Wir realisieren Innenausbau-Projekte in Bremen mit klaren Abläufen und festen Ansprechpartnern.",
@@ -297,7 +297,7 @@ const SERVICE_SEO_PAGES = [
   {
     serviceId: "03",
     slug: "trockenbau-bremen",
-    title: "Trockenbau in Bremen | Teamwork Construktion",
+    title: "Trockenbau in Bremen | Teamwork Construction",
     metaDescription:
       "Trockenbau in Bremen für Wände, Decken und Raumaufteilungen. Saubere Ausführung, klare Zeitplanung und flexible Lösungen für Ihr Projekt.",
     headline: "Trockenbau in Bremen",
@@ -307,7 +307,7 @@ const SERVICE_SEO_PAGES = [
   {
     serviceId: "04",
     slug: "boden-fliesen-bremen",
-    title: "Boden & Fliesen in Bremen | Teamwork Construktion",
+    title: "Boden & Fliesen in Bremen | Teamwork Construction",
     metaDescription:
       "Boden- und Fliesenarbeiten in Bremen: präzise Verlegung, saubere Anschlüsse und langlebige Ergebnisse für Innenbereiche und Modernisierung.",
     headline: "Boden & Fliesen in Bremen",
@@ -317,7 +317,7 @@ const SERVICE_SEO_PAGES = [
   {
     serviceId: "05",
     slug: "bad-teilmodernisierung-bremen",
-    title: "Bad-Teilmodernisierung in Bremen | Teamwork Construktion",
+    title: "Bad-Teilmodernisierung in Bremen | Teamwork Construction",
     metaDescription:
       "Bad-Teilmodernisierung in Bremen ohne Komplettumbau: effiziente Updates, kurze Umbauzeiten und Unterstützung bei förderrelevanten Maßnahmen.",
     headline: "Bad-Teilmodernisierung in Bremen",
@@ -327,7 +327,7 @@ const SERVICE_SEO_PAGES = [
   {
     serviceId: "06",
     slug: "wasserschaden-sanierung-bremen",
-    title: "Wasserschaden-Sanierung in Bremen | Teamwork Construktion",
+    title: "Wasserschaden-Sanierung in Bremen | Teamwork Construction",
     metaDescription:
       "Sanierung nach Wasserschaden in Bremen: strukturierter Rückbau und Wiederaufbau bis zur wohnlichen Übergabe. Schnell, sauber und zuverlässig.",
     headline: "Wasserschaden-Sanierung in Bremen",
@@ -337,7 +337,7 @@ const SERVICE_SEO_PAGES = [
   {
     serviceId: "07",
     slug: "gartenarbeit-sportanlagen-bremen",
-    title: "Gartenarbeit & Sportanlagen in Bremen | Teamwork Construktion",
+    title: "Gartenarbeit & Sportanlagen in Bremen | Teamwork Construction",
     metaDescription:
       "Gartenarbeit und Sportanlagen in Bremen: Aufwertung von Außenflächen und Montage von Outdoor-Fitness-Elementen aus einer Hand.",
     headline: "Gartenarbeit & Sportanlagen in Bremen",
@@ -350,9 +350,9 @@ const LOCATION_SEO_PAGES = [
   {
     slug: "bremen",
     locationName: "Bremen",
-    title: "Bauunternehmen in Bremen | Teamwork Construktion",
+    title: "Bauunternehmen in Bremen | Teamwork Construction",
     metaDescription:
-      "Teamwork Construktion in Bremen: Renovierung, Innenausbau, Sanierung, Gartenarbeit und Sportanlagen mit klaren Abläufen und festen Ansprechpartnern.",
+      "Teamwork Construction in Bremen: Renovierung, Innenausbau, Sanierung, Gartenarbeit und Sportanlagen mit klaren Abläufen und festen Ansprechpartnern.",
     headline: "Bauunternehmen in Bremen",
     intro:
       "Für Projekte in Bremen bieten wir Renovierung, Innenausbau, Sanierung und Außenanlagen aus einer Hand inklusive direkter Abstimmung.",
@@ -362,7 +362,7 @@ const LOCATION_SEO_PAGES = [
   {
     slug: "delmenhorst",
     locationName: "Delmenhorst",
-    title: "Bauunternehmen in Delmenhorst | Teamwork Construktion",
+    title: "Bauunternehmen in Delmenhorst | Teamwork Construction",
     metaDescription:
       "Leistungen in Delmenhorst: Renovierung, Trockenbau, Bad-Teilmodernisierung und Sanierung nach Wasserschaden inkl. KfW-Förderberatung.",
     headline: "Bauunternehmen in Delmenhorst",
@@ -374,9 +374,9 @@ const LOCATION_SEO_PAGES = [
   {
     slug: "lilienthal",
     locationName: "Lilienthal",
-    title: "Bauunternehmen in Lilienthal | Teamwork Construktion",
+    title: "Bauunternehmen in Lilienthal | Teamwork Construction",
     metaDescription:
-      "Teamwork Construktion für Lilienthal: Innenausbau, Modernisierung, Boden- und Fliesenarbeiten sowie Außenbereiche mit sauberer Umsetzung.",
+      "Teamwork Construction für Lilienthal: Innenausbau, Modernisierung, Boden- und Fliesenarbeiten sowie Außenbereiche mit sauberer Umsetzung.",
     headline: "Bauunternehmen in Lilienthal",
     intro:
       "Wir setzen Projekte in Lilienthal sauber und strukturiert um, von Wohnraummodernisierung bis Außenbereich und Gartenarbeit.",
@@ -398,7 +398,7 @@ const LOCATION_SEO_PAGES = [
   {
     slug: "stuhr",
     locationName: "Stuhr",
-    title: "Bauunternehmen in Stuhr | Teamwork Construktion",
+    title: "Bauunternehmen in Stuhr | Teamwork Construction",
     metaDescription:
       "Bau- und Sanierungsleistungen in Stuhr: von Innenausbau bis Gartenarbeit, termintreu umgesetzt und auf Wunsch nach KfW-Vorgaben geplant.",
     headline: "Bauunternehmen in Stuhr",
@@ -410,9 +410,9 @@ const LOCATION_SEO_PAGES = [
   {
     slug: "weyhe",
     locationName: "Weyhe",
-    title: "Bauunternehmen in Weyhe | Teamwork Construktion",
+    title: "Bauunternehmen in Weyhe | Teamwork Construction",
     metaDescription:
-      "Teamwork Construktion in Weyhe: Modernisierung, Wasserschaden-Sanierung, Sportanlagen und Außenarbeiten mit schneller Rückmeldung.",
+      "Teamwork Construction in Weyhe: Modernisierung, Wasserschaden-Sanierung, Sportanlagen und Außenarbeiten mit schneller Rückmeldung.",
     headline: "Bauunternehmen in Weyhe",
     intro:
       "In Weyhe begleiten wir Wohn- und Außenprojekte zuverlässig vom Erstkontakt bis zur besenreinen Übergabe.",
@@ -476,13 +476,13 @@ const FOOTER_LINKS = [
 const LEGAL_CONTENT = {
   impressum: {
     title: "IMPRESSUM",
-    subtitle: "Verantwortliche Angaben für Teamwork Construktion",
+    subtitle: "Verantwortliche Angaben für Teamwork Construction",
     intro:
       "Hier finden Sie die rechtlich relevanten Basisinformationen zum Unternehmen, zur Vertretung und zu Kontaktwegen.",
     sections: [
       {
         heading: "Anbieter",
-        text: "Teamwork Construktion · Bremen & Umgebung. Angaben zu Vertretung und ladungsfähiger Anschrift werden hier final gepflegt.",
+        text: "Teamwork Construction · Bremen & Umgebung. Angaben zu Vertretung und ladungsfähiger Anschrift werden hier final gepflegt.",
       },
       {
         heading: "Kontakt",
@@ -732,7 +732,7 @@ function Header({ menuOpen, onMenuToggle, isScrolled, isHeaderHidden, reduceMoti
             TEAMWORK
           </span>
           <span className="hidden sm:inline text-base font-semibold tracking-tight text-gray-600 lg:text-lg">
-            CONSTRUKTION
+            CONSTRUCTION
           </span>
         </Link>
 
@@ -2050,7 +2050,7 @@ function KontaktPage() {
               </article>
 
               <article className={`${cardClass} overflow-hidden`}>
-                <img src={IMAGE_SOURCES.kontaktHero} alt="Kontaktmotiv Teamwork Construktion" loading="lazy" className="h-44 w-full object-cover" />
+                <img src={IMAGE_SOURCES.kontaktHero} alt="Kontaktmotiv Teamwork Construction" loading="lazy" className="h-44 w-full object-cover" />
                 <div className="p-4 sm:p-5">
                   <div className="flex flex-col items-start gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
                     <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">E-Mail</p>
